@@ -10,23 +10,45 @@ class Game
   class BowlingError < StandardError; end 
 
   def initialize 
-    @rolls = []
+    @unprocessed_rolls = []
     @frames = []
   end
 
   def roll(pins)
     raise BowlingError if pins < 0 || pins > 10
-    @rolls << pins 
+    raise BowlingError if @frames.length >= 10 
+
+    @unprocessed_rolls << pins 
+
+    if frame_ready_to_be_processed?
+      frame = Frame.new(@unprocessed_rolls)
+      @frames << frame 
+      @unprocessed_rolls = frame.process 
+    end
   end
 
   def score 
-    until @frames.length == 10 do 
-      frame = Frame.new(@rolls)
-      @frames << frame 
-      @rolls = frame.process 
-    end
+    raise BowlingError if @frames.length < 10 
 
     @frames.collect(&:score).sum 
+  end
+
+  def frame_ready_to_be_processed?
+    first = @unprocessed_rolls[0]
+    second = @unprocessed_rolls[1]
+    third = @unprocessed_rolls[2]
+
+    return false if !second 
+
+    if first + second < 10 
+      true 
+    elsif first == 10 
+      second && third 
+    elsif first + second == 10
+      third 
+    else 
+      raise BowlingError
+    end
   end
 end
 
@@ -38,17 +60,23 @@ class Frame
   end
 
   def process  
-    if @rolls.first == 10 
-      raise Game::BowlingError if !(@rolls[1] && @rolls[2])
-      @score = 10 + @rolls[1] + @rolls[2] 
+    first = @rolls[0]
+    second = @rolls[1]
+    third = @rolls[2]
+
+    if first == 10 
+      if second + third > 10 
+        raise Game::BowlingError unless second == 10 
+      end
+      @score = 10 + second + third 
       @rolls.drop(1)
-    elsif @rolls.first + @rolls[1] == 10 
-      @score = 10 + @rolls[2] 
+    elsif first + second == 10 
+      @score = 10 + third 
       @rolls.drop(2)
-    elsif @rolls.first + @rolls[1] > 10
+    elsif first + second > 10
       raise Game::BowlingError 
     else
-      @score = @rolls.first + @rolls[1] 
+      @score = first + second 
       @rolls.drop(2)
     end
   end
